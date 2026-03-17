@@ -1,0 +1,16 @@
+[project]
+name = "twitter-mcp-server"
+version = "1.0.0"
+description = "Free Twitter/X integration for AI agents — no API key needed"
+authors = [{name = "Miles Shah", email = "miles@example.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "playwright"
+]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
