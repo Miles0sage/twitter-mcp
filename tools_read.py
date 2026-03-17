@@ -114,27 +114,25 @@ async def _get_user_profile_async(username: str) -> str:
         url = f"https://x.com/{username}"
         await page.goto(url)
 
-        # Wait for profile elements to load
-        await page.wait_for_selector('[data-testid="UserName"]', timeout=10000)
+        # Wait for page to load
+        await page.wait_for_timeout(3000)
 
         # Extract bio
-        bio_el = await page.query_selector('div[data-testid="UserDescription"]')
-        bio = await bio_el.inner_text() if bio_el else "No bio available"
+        bio_el = await page.query_selector('[data-testid="UserDescription"]')
+        bio = await bio_el.inner_text() if bio_el else "No bio"
 
-        # Extract follower count
-        follower_el = await page.query_selector('a[href*="/followers"] span')
-        follower_count = await follower_el.inner_text() if follower_el else "Unknown"
+        # Extract follower/following from links
+        follower_el = await page.query_selector('a[href$="/verified_followers"] span span, a[href$="/followers"] span span')
+        followers = await follower_el.inner_text() if follower_el else "?"
 
-        # Extract following count
-        following_el = await page.query_selector('a[href*="/following"] span')
-        following_count = await following_el.inner_text() if following_el else "Unknown"
+        following_el = await page.query_selector('a[href$="/following"] span span')
+        following = await following_el.inner_text() if following_el else "?"
 
-        # Extract tweet count
-        tweet_count_el = await page.query_selector('a[href*="/with_replies"] span')
-        tweet_count = await tweet_count_el.inner_text() if tweet_count_el else "Unknown"
+        # Get display name from page
+        name_el = await page.query_selector('[data-testid="UserName"] span')
+        name = await name_el.inner_text() if name_el else username
 
-        profile_info = f"Username: {username}\nBio: {bio}\nFollowers: {follower_count}\nFollowing: {following_count}\nTweets: {tweet_count}"
-        return profile_info
+        return f"Name: {name}\nUsername: @{username}\nBio: {bio}\nFollowers: {followers}\nFollowing: {following}"
 
     finally:
         await browser.close()
@@ -276,37 +274,27 @@ async def _get_trending_async() -> str:
         await page.goto("https://x.com/home", wait_until="networkidle")
         await page.wait_for_timeout(3000)
 
-        # The "What's happening" sidebar has trends
-        # Try multiple selectors
-        trend_elements = await page.query_selector_all('[data-testid="trend"]')
-        if not trend_elements:
-            # Fallback: get sidebar section content
-            sidebar = await page.query_selector_all('section[aria-labelledby] div[role="link"]')
-            if sidebar:
-                trend_elements = sidebar
-
-        # Extract trending topics
+        # Get trends from sidebar "What's happening" section
         trend_elements = await page.query_selector_all('[data-testid="trend"]')
 
         trends = []
-        for i, trend_element in enumerate(trend_elements[:10]):
+        for el in trend_elements[:15]:
             try:
-                full_text = await trend_element.inner_text()
-                # Extract the trend name from the multi-line text
-                lines = [l.strip() for l in full_text.split('\n') if l.strip()]
-                # Usually: category, trend name, tweet count
-                trend_name = lines[1] if len(lines) > 1 else lines[0] if lines else ""
-                extra = lines[2] if len(lines) > 2 else ""
-                if trend_name:
-                    entry = f"{i+1}. {trend_name}"
-                    if extra and ("post" in extra.lower() or "tweet" in extra.lower() or "k " in extra.lower()):
-                        entry += f" ({extra})"
+                full_text = await el.inner_text()
+                lines = [l.strip() for l in full_text.split('\n') if l.strip() and l.strip() != '·']
+                lines = [l for l in lines if len(l) > 1 and l not in ('Trending', 'Show more')]
+                if lines:
+                    entry = f"{len(trends)+1}. {lines[0]}"
+                    if len(lines) > 1 and any(w in lines[1].lower() for w in ['post', 'k ', 'trending']):
+                        entry += f" ({lines[1]})"
                     trends.append(entry)
+                    if len(trends) >= 10:
+                        break
             except Exception:
                 continue
 
         if not trends:
-            return "No trending topics found."
+            return "Trending unavailable on headless VPS. Use twitter_search to find popular topics."
 
         return "Trending Topics:\n" + "\n".join(trends)
 

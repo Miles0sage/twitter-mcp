@@ -128,24 +128,19 @@ async def read_notifications() -> str:
 
             for notification_element in notification_elements:
                 try:
-                    # Extract notification text/content
-                    notification_text_element = await notification_element.query_selector('div[lang]')
-                    notification_text = ""
-                    if notification_text_element:
-                        notification_text = await notification_text_element.inner_text()
+                    full_text = await notification_element.inner_text()
+                    lines = [l.strip() for l in full_text.split('\n') if l.strip()]
+                    text = ' '.join(lines[:5]) if lines else ""
 
-                    # Extract timestamp
                     time_element = await notification_element.query_selector('time')
                     timestamp = ""
                     if time_element:
                         timestamp = await time_element.get_attribute('datetime')
 
-                    notification_data = {
-                        "content": notification_text,
+                    notifications.append({
+                        "text": text[:300],
                         "timestamp": timestamp
-                    }
-
-                    notifications.append(notification_data)
+                    })
 
                 except Exception:
                     continue  # Skip problematic notifications
