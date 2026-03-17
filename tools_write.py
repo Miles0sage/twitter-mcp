@@ -18,7 +18,11 @@ async def _setup_browser():
 
     # Start Playwright and launch browser with context
     playwright = await async_playwright().start()
-    browser = await playwright.chromium.launch(headless=True)
+    browser = await playwright.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        ignore_default_args=['--enable-automation'],
+    )
 
     # Create context with saved storage state
     context = await browser.new_context(

@@ -20,7 +20,11 @@ async def read_feed(max_results: int = 20) -> str:
         return json.dumps({"error": f"Storage state not found at {storage_state_path}"})
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+            ignore_default_args=['--enable-automation'],
+        )
         context = await browser.new_context(storage_state=str(storage_state_path))
         page = await context.new_page()
 
@@ -103,7 +107,11 @@ async def read_notifications() -> str:
         return json.dumps({"error": f"Storage state not found at {storage_state_path}"})
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+            ignore_default_args=['--enable-automation'],
+        )
         context = await browser.new_context(storage_state=str(storage_state_path))
         page = await context.new_page()
 

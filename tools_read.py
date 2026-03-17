@@ -8,10 +8,18 @@ from typing import Optional
 async def _search_tweets_async(query: str, max_results: int = 10) -> str:
     """Navigate to Twitter search and extract tweets."""
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=['--no-sandbox'])
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        ignore_default_args=['--enable-automation'],
+    )
 
     try:
-        context = await browser.new_context()
+        from pathlib import Path
+        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
+        context = await browser.new_context(
+            storage_state=str(storage) if storage.exists() else None
+        )
         page = await context.new_page()
 
         # Navigate to search results
@@ -88,10 +96,18 @@ def search_tweets(query: str, max_results: int = 10) -> str:
 async def _get_user_profile_async(username: str) -> str:
     """Get user profile information from Twitter."""
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=['--no-sandbox'])
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        ignore_default_args=['--enable-automation'],
+    )
 
     try:
-        context = await browser.new_context()
+        from pathlib import Path
+        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
+        context = await browser.new_context(
+            storage_state=str(storage) if storage.exists() else None
+        )
         page = await context.new_page()
 
         # Navigate to user profile
@@ -142,10 +158,18 @@ def get_user_profile(username: str) -> str:
 async def _get_user_tweets_async(username: str, max_results: int = 10) -> str:
     """Get tweets from a user's profile."""
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=['--no-sandbox'])
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        ignore_default_args=['--enable-automation'],
+    )
 
     try:
-        context = await browser.new_context()
+        from pathlib import Path
+        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
+        context = await browser.new_context(
+            storage_state=str(storage) if storage.exists() else None
+        )
         page = await context.new_page()
 
         # Navigate to user profile
@@ -234,29 +258,50 @@ def get_user_tweets(username: str, max_results: int = 10) -> str:
 async def _get_trending_async() -> str:
     """Get trending topics from Twitter."""
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=['--no-sandbox'])
+    browser = await pw.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        ignore_default_args=['--enable-automation'],
+    )
 
     try:
-        context = await browser.new_context()
+        from pathlib import Path
+        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
+        context = await browser.new_context(
+            storage_state=str(storage) if storage.exists() else None
+        )
         page = await context.new_page()
 
-        # Navigate to trending page
-        url = "https://x.com/explore/tabs/trending"
-        await page.goto(url)
+        # Navigate to home page — trending sidebar loads here
+        await page.goto("https://x.com/home", wait_until="networkidle")
+        await page.wait_for_timeout(3000)
 
-        # Wait for trending elements to load
-        await page.wait_for_selector('[data-testid="trend"]', timeout=10000)
+        # The "What's happening" sidebar has trends
+        # Try multiple selectors
+        trend_elements = await page.query_selector_all('[data-testid="trend"]')
+        if not trend_elements:
+            # Fallback: get sidebar section content
+            sidebar = await page.query_selector_all('section[aria-labelledby] div[role="link"]')
+            if sidebar:
+                trend_elements = sidebar
 
         # Extract trending topics
         trend_elements = await page.query_selector_all('[data-testid="trend"]')
 
         trends = []
-        for i, trend_element in enumerate(trend_elements[:10]):  # Get top 10 trends
+        for i, trend_element in enumerate(trend_elements[:10]):
             try:
-                trend_text_el = await trend_element.query_selector('div[dir="ltr"] span')
-                if trend_text_el:
-                    trend_text = await trend_text_el.inner_text()
-                    trends.append(f"{i+1}. {trend_text}")
+                full_text = await trend_element.inner_text()
+                # Extract the trend name from the multi-line text
+                lines = [l.strip() for l in full_text.split('\n') if l.strip()]
+                # Usually: category, trend name, tweet count
+                trend_name = lines[1] if len(lines) > 1 else lines[0] if lines else ""
+                extra = lines[2] if len(lines) > 2 else ""
+                if trend_name:
+                    entry = f"{i+1}. {trend_name}"
+                    if extra and ("post" in extra.lower() or "tweet" in extra.lower() or "k " in extra.lower()):
+                        entry += f" ({extra})"
+                    trends.append(entry)
             except Exception:
                 continue
 
