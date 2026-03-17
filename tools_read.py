@@ -3,24 +3,15 @@ import urllib.parse
 from playwright.async_api import async_playwright
 import concurrent.futures
 from typing import Optional
+from browser_session import get_persistent_context, close_session
 
 
 async def _search_tweets_async(query: str, max_results: int = 10) -> str:
     """Navigate to Twitter search and extract tweets."""
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-        ignore_default_args=['--enable-automation'],
-    )
+    pw, context = await get_persistent_context()
 
     try:
-        from pathlib import Path
-        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
-        context = await browser.new_context(
-            storage_state=str(storage) if storage.exists() else None
-        )
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
 
         # Navigate to search results
         encoded_query = urllib.parse.quote(query)
@@ -75,8 +66,7 @@ async def _search_tweets_async(query: str, max_results: int = 10) -> str:
         return "\n".join(results)
 
     finally:
-        await browser.close()
-        await pw.stop()
+        await close_session(pw, context)
 
 
 def search_tweets(query: str, max_results: int = 10) -> str:
@@ -95,20 +85,10 @@ def search_tweets(query: str, max_results: int = 10) -> str:
 
 async def _get_user_profile_async(username: str) -> str:
     """Get user profile information from Twitter."""
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-        ignore_default_args=['--enable-automation'],
-    )
+    pw, context = await get_persistent_context()
 
     try:
-        from pathlib import Path
-        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
-        context = await browser.new_context(
-            storage_state=str(storage) if storage.exists() else None
-        )
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
 
         # Navigate to user profile
         url = f"https://x.com/{username}"
@@ -135,8 +115,7 @@ async def _get_user_profile_async(username: str) -> str:
         return f"Name: {name}\nUsername: @{username}\nBio: {bio}\nFollowers: {followers}\nFollowing: {following}"
 
     finally:
-        await browser.close()
-        await pw.stop()
+        await close_session(pw, context)
 
 
 def get_user_profile(username: str) -> str:
@@ -155,20 +134,10 @@ def get_user_profile(username: str) -> str:
 
 async def _get_user_tweets_async(username: str, max_results: int = 10) -> str:
     """Get tweets from a user's profile."""
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-        ignore_default_args=['--enable-automation'],
-    )
+    pw, context = await get_persistent_context()
 
     try:
-        from pathlib import Path
-        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
-        context = await browser.new_context(
-            storage_state=str(storage) if storage.exists() else None
-        )
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
 
         # Navigate to user profile
         url = f"https://x.com/{username}"
@@ -235,8 +204,7 @@ async def _get_user_tweets_async(username: str, max_results: int = 10) -> str:
         return result
 
     finally:
-        await browser.close()
-        await pw.stop()
+        await close_session(pw, context)
 
 
 def get_user_tweets(username: str, max_results: int = 10) -> str:
@@ -255,20 +223,10 @@ def get_user_tweets(username: str, max_results: int = 10) -> str:
 
 async def _get_trending_async() -> str:
     """Get trending topics from Twitter."""
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-        ignore_default_args=['--enable-automation'],
-    )
+    pw, context = await get_persistent_context()
 
     try:
-        from pathlib import Path
-        storage = Path.home() / '.twitter-mcp' / 'storage_state.json'
-        context = await browser.new_context(
-            storage_state=str(storage) if storage.exists() else None
-        )
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
 
         # Navigate to home page — trending sidebar loads here
         await page.goto("https://x.com/home", wait_until="networkidle")
@@ -299,8 +257,7 @@ async def _get_trending_async() -> str:
         return "Trending Topics:\n" + "\n".join(trends)
 
     finally:
-        await browser.close()
-        await pw.stop()
+        await close_session(pw, context)
 
 
 def get_trending() -> str:

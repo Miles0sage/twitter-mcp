@@ -1,51 +1,48 @@
 #!/usr/bin/env python3
-"""Twitter session keepalive — pings X.com every 30 min to prevent cookie expiry."""
+"""Twitter session keepalive — pings X.com every 30 min to prevent cookie expiry.
+
+Uses persistent browser profile (same as all tools) so cookies stay alive
+in the Chrome profile directory, not just storage_state.json.
+"""
 
 import asyncio
 import json
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
+from browser_session import get_persistent_context, close_session
 
-STORAGE_STATE = Path.home() / ".twitter-mcp" / "storage_state.json"
 LOG_DIR = Path(__file__).parent / "data"
 
 
 async def ping_twitter() -> dict:
-    from playwright.async_api import async_playwright
-
-    if not STORAGE_STATE.exists():
-        return {"success": False, "error": "storage_state.json not found"}
-
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=True,
-        args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
-        ignore_default_args=["--enable-automation"],
-    )
-    context = await browser.new_context(storage_state=str(STORAGE_STATE))
+    try:
+        pw, context = await get_persistent_context()
+    except Exception as e:
+        return {"success": False, "error": f"Browser launch failed: {e}"}
 
     try:
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
         resp = await page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=20000)
         url = page.url
         status = resp.status if resp else 0
 
         if "login" in url or "accounts.google" in url:
-            await browser.close()
-            await pw.stop()
+            await close_session(pw, context)
             return {"success": False, "error": "Session expired", "url": url}
 
-        # Save refreshed cookies
-        await context.storage_state(path=str(STORAGE_STATE))
-        await browser.close()
-        await pw.stop()
+        # Scroll a bit to look human
+        await page.evaluate("window.scrollTo(0, 300)")
+        await page.wait_for_timeout(2000)
+
+        await close_session(pw, context)
         return {"success": True, "status": status, "message": "Session alive, cookies refreshed"}
 
     except Exception as e:
-        await browser.close()
-        await pw.stop()
+        try:
+            await close_session(pw, context)
+        except Exception:
+            pass
         return {"success": False, "error": str(e)}
 
 

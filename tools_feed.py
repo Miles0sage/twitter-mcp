@@ -1,164 +1,116 @@
 import asyncio
 import json
-from playwright.async_api import async_playwright
-from pathlib import Path
+import concurrent.futures
+from browser_session import get_persistent_context, close_session
 
 
 async def read_feed(max_results: int = 20) -> str:
-    """
-    Read tweets from the Twitter home feed.
+    """Read tweets from the Twitter home feed."""
+    pw, context = await get_persistent_context()
 
-    Args:
-        max_results: Maximum number of tweets to return (default: 20)
+    try:
+        page = context.pages[0] if context.pages else await context.new_page()
 
-    Returns:
-        JSON string containing tweet data (text, author, timestamp)
-    """
-    storage_state_path = Path.home() / ".twitter-mcp" / "storage_state.json"
+        # Navigate to Twitter home
+        await page.goto("https://x.com/home", wait_until="networkidle")
 
-    if not storage_state_path.exists():
-        return json.dumps({"error": f"Storage state not found at {storage_state_path}"})
+        # Wait for tweets to load
+        await page.wait_for_selector('[data-testid="tweet"]', timeout=10000)
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-            ignore_default_args=['--enable-automation'],
-        )
-        context = await browser.new_context(storage_state=str(storage_state_path))
-        page = await context.new_page()
+        tweets = []
+        scroll_attempts = 0
+        max_scroll_attempts = 10
 
-        try:
-            # Navigate to Twitter home
-            await page.goto("https://x.com/home", wait_until="networkidle")
+        while len(tweets) < max_results and scroll_attempts < max_scroll_attempts:
+            tweet_elements = await page.query_selector_all('[data-testid="tweet"]')
 
-            # Wait for tweets to load
-            await page.wait_for_selector('[data-testid="tweet"]', timeout=10000)
+            for tweet_element in tweet_elements:
+                if len(tweets) >= max_results:
+                    break
 
-            tweets = []
-            scroll_attempts = 0
-            max_scroll_attempts = 10  # Prevent infinite scrolling
+                try:
+                    tweet_text_element = await tweet_element.query_selector('div[data-testid="tweetText"]')
+                    tweet_text = await tweet_text_element.inner_text() if tweet_text_element else ""
 
-            while len(tweets) < max_results and scroll_attempts < max_scroll_attempts:
-                # Get all tweet elements
-                tweet_elements = await page.query_selector_all('[data-testid="tweet"]')
+                    author_element = await tweet_element.query_selector('div[data-testid="User-Name"] div span')
+                    author = await author_element.inner_text() if author_element else ""
 
-                for tweet_element in tweet_elements:
-                    if len(tweets) >= max_results:
-                        break
+                    time_element = await tweet_element.query_selector('time')
+                    timestamp = await time_element.get_attribute('datetime') if time_element else ""
 
-                    try:
-                        # Extract tweet text
-                        tweet_text_element = await tweet_element.query_selector('div[data-testid="tweetText"]')
-                        tweet_text = ""
-                        if tweet_text_element:
-                            tweet_text = await tweet_text_element.inner_text()
+                    tweet_data = {"author": author, "text": tweet_text, "timestamp": timestamp}
 
-                        # Extract author
-                        author_element = await tweet_element.query_selector('div[data-testid="User-Name"] div span')
-                        author = ""
-                        if author_element:
-                            author = await author_element.inner_text()
+                    if tweet_data not in tweets:
+                        tweets.append(tweet_data)
 
-                        # Extract timestamp
-                        time_element = await tweet_element.query_selector('time')
-                        timestamp = ""
-                        if time_element:
-                            timestamp = await time_element.get_attribute('datetime')
+                except Exception:
+                    continue
 
-                        tweet_data = {
-                            "author": author,
-                            "text": tweet_text,
-                            "timestamp": timestamp
-                        }
+            if len(tweets) < max_results:
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(2)
+                scroll_attempts += 1
 
-                        # Avoid adding duplicate tweets
-                        if tweet_data not in tweets:
-                            tweets.append(tweet_data)
+        return json.dumps(tweets, ensure_ascii=False)
 
-                    except Exception:
-                        continue  # Skip problematic tweets
+    except Exception as e:
+        return json.dumps({"error": f"Failed to read feed: {str(e)}"})
 
-                if len(tweets) < max_results:
-                    # Scroll to load more tweets
-                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await asyncio.sleep(2)  # Wait for new tweets to load
-                    scroll_attempts += 1
-
-            return json.dumps(tweets, ensure_ascii=False)
-
-        except Exception as e:
-            return json.dumps({"error": f"Failed to read feed: {str(e)}"})
-
-        finally:
-            await browser.close()
+    finally:
+        await close_session(pw, context)
 
 
 async def read_notifications() -> str:
-    """
-    Read notifications from Twitter.
+    """Read notifications from Twitter."""
+    pw, context = await get_persistent_context()
 
-    Returns:
-        JSON string containing notification data
-    """
-    storage_state_path = Path.home() / ".twitter-mcp" / "storage_state.json"
+    try:
+        page = context.pages[0] if context.pages else await context.new_page()
 
-    if not storage_state_path.exists():
-        return json.dumps({"error": f"Storage state not found at {storage_state_path}"})
+        await page.goto("https://x.com/notifications", wait_until="networkidle")
+        await page.wait_for_selector('[data-testid="notification"]', timeout=10000)
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-            ignore_default_args=['--enable-automation'],
-        )
-        context = await browser.new_context(storage_state=str(storage_state_path))
-        page = await context.new_page()
+        notifications = []
+        notification_elements = await page.query_selector_all('[data-testid="notification"]')
 
-        try:
-            # Navigate to Twitter notifications
-            await page.goto("https://x.com/notifications", wait_until="networkidle")
+        for notification_element in notification_elements:
+            try:
+                full_text = await notification_element.inner_text()
+                lines = [l.strip() for l in full_text.split('\n') if l.strip()]
+                text = ' '.join(lines[:5]) if lines else ""
 
-            # Wait for notifications to load
-            await page.wait_for_selector('[data-testid="notification"]', timeout=10000)
+                time_element = await notification_element.query_selector('time')
+                timestamp = await time_element.get_attribute('datetime') if time_element else ""
 
-            notifications = []
-            # Get all notification elements
-            notification_elements = await page.query_selector_all('[data-testid="notification"]')
+                notifications.append({"text": text[:300], "timestamp": timestamp})
 
-            for notification_element in notification_elements:
-                try:
-                    full_text = await notification_element.inner_text()
-                    lines = [l.strip() for l in full_text.split('\n') if l.strip()]
-                    text = ' '.join(lines[:5]) if lines else ""
+            except Exception:
+                continue
 
-                    time_element = await notification_element.query_selector('time')
-                    timestamp = ""
-                    if time_element:
-                        timestamp = await time_element.get_attribute('datetime')
+        return json.dumps(notifications, ensure_ascii=False)
 
-                    notifications.append({
-                        "text": text[:300],
-                        "timestamp": timestamp
-                    })
+    except Exception as e:
+        return json.dumps({"error": f"Failed to read notifications: {str(e)}"})
 
-                except Exception:
-                    continue  # Skip problematic notifications
-
-            return json.dumps(notifications, ensure_ascii=False)
-
-        except Exception as e:
-            return json.dumps({"error": f"Failed to read notifications: {str(e)}"})
-
-        finally:
-            await browser.close()
+    finally:
+        await close_session(pw, context)
 
 
 def sync_read_feed(max_results: int = 20) -> str:
     """Synchronous wrapper for read_feed"""
-    return asyncio.run(read_feed(max_results))
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            return executor.submit(asyncio.run, read_feed(max_results)).result()
+    except RuntimeError:
+        return asyncio.run(read_feed(max_results))
 
 
 def sync_read_notifications() -> str:
     """Synchronous wrapper for read_notifications"""
-    return asyncio.run(read_notifications())
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            return executor.submit(asyncio.run, read_notifications()).result()
+    except RuntimeError:
+        return asyncio.run(read_notifications())
