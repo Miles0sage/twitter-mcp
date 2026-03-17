@@ -24,9 +24,15 @@ BROWSER_ARGS = [
     "--disable-features=IsolateOrigins,site-per-process",
     "--disable-site-isolation-trials",
     "--disable-web-security",
+    "--restore-last-session",  # CRITICAL: prevents Chromium from discarding session cookies on restart
 ]
 
 IGNORE_ARGS = ["--enable-automation"]
+
+# Twitter blocks headless browsers. Use Xvfb virtual display instead.
+# Install: apt-get install -y xvfb
+# Start: Xvfb :99 -screen 0 1280x720x24 & export DISPLAY=:99
+USE_HEADLESS = False  # Set True only if Xvfb is NOT available
 
 
 async def get_persistent_context() -> tuple:
@@ -47,9 +53,14 @@ async def get_persistent_context() -> tuple:
     storage_path = Path(STORAGE_BACKUP)
     profile_cookies = Path(PROFILE_DIR) / "Default" / "Cookies"
 
+    # Check if Xvfb is running — if so, use non-headless (avoids Twitter bot detection)
+    import shutil
+    has_display = os.environ.get("DISPLAY") is not None
+    headless = USE_HEADLESS if has_display else True  # Fallback to headless if no display
+
     context = await pw.chromium.launch_persistent_context(
         user_data_dir=PROFILE_DIR,
-        headless=True,
+        headless=headless,
         args=BROWSER_ARGS,
         ignore_default_args=IGNORE_ARGS,
         # Import storage state on first run to seed the profile
