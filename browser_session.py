@@ -63,11 +63,20 @@ async def get_persistent_context() -> tuple:
         headless=headless,
         args=BROWSER_ARGS,
         ignore_default_args=IGNORE_ARGS,
-        # Import storage state on first run to seed the profile
-        storage_state=str(storage_path) if (storage_path.exists() and not profile_cookies.exists()) else None,
         viewport={"width": 1280, "height": 900},
         user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     )
+
+    # Seed profile from storage_state.json on first run (if profile is fresh)
+    if storage_path.exists() and not profile_cookies.exists():
+        try:
+            import json
+            with open(storage_path) as f:
+                state = json.load(f)
+            if "cookies" in state:
+                await context.add_cookies(state["cookies"])
+        except Exception:
+            pass  # Non-critical
 
     return pw, context
 
