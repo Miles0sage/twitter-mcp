@@ -1,84 +1,181 @@
-# 🐦 Twitter/X MCP Server
+# Twitter/X MCP Server
 
-Free Twitter/X integration for AI agents — no API key needed. Read tweets, post, search, trending — all via Playwright browser automation.
+**Read, search, and post on Twitter/X from any AI agent.** No API key needed -- uses persistent browser sessions.
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/) [![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-brightgreen.svg)](https://github.com/modelcontextprotocol) [![Tools](https://img.shields.io/badge/Tools-12-orange.svg)](#)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-brightgreen?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PC9zdmc+)](https://modelcontextprotocol.io)
+[![Tools: 11](https://img.shields.io/badge/tools-11-orange.svg)](#tools)
+[![GitHub stars](https://img.shields.io/github/stars/Miles0sage/twitter-mcp?style=social)](https://github.com/Miles0sage/twitter-mcp)
 
-## What
+---
 
-Twitter/X MCP Server provides a complete integration layer between AI agents and Twitter/X using Playwright browser automation. Unlike traditional Twitter API approaches that require API keys and face rate limits, this server leverages browser automation to access Twitter functionality without API restrictions. It offers tools for reading tweets, posting content, searching, trending topics, and more — all accessible through the Model Context Protocol (MCP).
+## Why This Exists
+
+Twitter's API costs $100+/month and rate-limits everything. This MCP server uses **Playwright browser automation** with a persistent Chrome profile instead -- zero API fees, no rate limit headaches. Your AI agent gets full Twitter access through the Model Context Protocol.
+
+Works with Claude Code, Cursor, Windsurf, or any MCP-compatible client.
+
+---
 
 ## Tools
 
-| Tool Name | Description | Authentication Required |
-|----------|-------------|------------------------|
-| twitter_search | Search for tweets by keyword or hashtag | No |
-| twitter_post | Post a new tweet | Yes |
-| twitter_read_feed | Read the user's feed | Yes |
-| twitter_read_profile | Read a user's profile information | No |
-| twitter_read_tweet | Read a specific tweet | No |
-| twitter_like_tweet | Like a specific tweet | Yes |
-| twitter_retweet | Retweet a specific tweet | Yes |
-| twitter_follow_user | Follow a user | Yes |
-| twitter_unfollow_user | Unfollow a user | Yes |
-| twitter_get_trending | Get trending topics | No |
-| twitter_get_user_tweets | Get tweets from a specific user | No |
-| twitter_reply_to_tweet | Reply to a specific tweet | Yes |
+| Category | Tool | Description | Auth Required |
+|----------|------|-------------|:---:|
+| **Read** | `twitter_search` | Search tweets by keyword or hashtag | No |
+| | `twitter_feed` | Read your home timeline | Yes |
+| | `twitter_bookmarks` | Read your saved bookmarks | Yes |
+| | `twitter_user` | Get a user's profile info | No |
+| | `twitter_user_tweets` | Get tweets from a specific user | No |
+| | `twitter_trending` | Get trending topics | No |
+| | `twitter_notifications` | Read your notifications | Yes |
+| **Write** | `twitter_post` | Post a new tweet | Yes |
+| | `twitter_reply` | Reply to a tweet | Yes |
+| | `twitter_like` | Like a tweet | Yes |
+| | `twitter_retweet` | Retweet a tweet | Yes |
+
+> **No API key needed.** Read-only tools work without authentication. Write tools require a one-time browser login (cookies persist automatically).
+
+---
 
 ## Quick Start
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/twitter-mcp.git
+git clone https://github.com/Miles0sage/twitter-mcp.git
 cd twitter-mcp
-```
-
-2. Install dependencies:
-```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
 
-3. Add to your `~/.mcp.json`:
+Add to your MCP config (`~/.mcp.json` or client settings):
+
 ```json
 {
-  "servers": [
-    {
-      "name": "twitter-mcp",
-      "cmd": ["python", "/path/to/your/twitter-mcp/server.py"],
-      "env": {}
+  "mcpServers": {
+    "twitter": {
+      "command": "python3",
+      "args": ["server.py"],
+      "cwd": "/path/to/twitter-mcp"
     }
-  ]
+  }
 }
 ```
 
-## Auth Setup
+---
 
-For write operations (posting, liking, following, etc.), you need to authenticate with Twitter/X using Playwright:
+## Authentication
 
-1. Run the login command:
+This server uses a **persistent Chrome profile** stored at `~/.twitter-mcp/chrome-profile/`. Log in once and your session persists across restarts.
+
+### First-time setup
+
 ```bash
-playwright open https://twitter.com
+# Opens a real browser -- log in to Twitter/X manually
+python3 -c "from browser_session import login; login()"
 ```
 
-2. Login with your Twitter/X credentials in the opened browser
-3. The authentication cookies will be saved for use by the tools
+Once logged in, cookies are saved to the Chrome profile. All future MCP calls reuse the session automatically.
 
-## Examples
+### Headless vs non-headless
 
-### Search for tweets:
-```python
-# Search for tweets containing a keyword
-tweets = twitter_search(keyword="AI", max_results=10)
+Twitter blocks headless browsers. The server runs Chromium with `DISPLAY=:99` (Xvfb) by default for server environments. On desktop, it uses your normal display.
+
+```bash
+# Server/VPS setup
+export DISPLAY=:99
+Xvfb :99 -screen 0 1920x1080x24 &
 ```
 
-### Post a tweet:
-```python
-# Post a new tweet (requires authentication)
-result = twitter_post(content="Just tried the new Twitter/X MCP server! Amazing!")
+### Keepalive
+
+A keepalive script prevents session expiry by loading Twitter periodically:
+
+```bash
+# Add to crontab (every 30 min)
+*/30 * * * * DISPLAY=:99 python3 /path/to/twitter-mcp/twitter_keepalive.py
 ```
 
-### Read your feed:
-```python
-# Read the authenticated user's feed (requires authentication)
-feed_tweets = twitter_read_feed(max_results=20)
+---
+
+## Usage Examples
+
 ```
+"Search Twitter for AI agent news"
+  -> Latest tweets matching query, with engagement stats
+
+"Read my feed"
+  -> Your home timeline, newest first
+
+"Show my bookmarks"
+  -> Your saved/bookmarked tweets
+
+"Post: Just shipped a new MCP server!"
+  -> Tweet posted, returns URL
+
+"What's trending?"
+  -> Top trending topics with tweet counts
+
+"Get @elonmusk's recent tweets"
+  -> Latest tweets from the user
+```
+
+---
+
+## Architecture
+
+```
+LLM / MCP Client
+       |
+  MCP Protocol (stdio)
+       |
+  server.py ── registers 11 tools
+       |
+  +----+----+--------+
+  |         |        |
+tools_   tools_   tools_
+read.py  feed.py  write.py
+  |         |        |
+  +----+----+--------+
+       |
+  browser_session.py
+  (persistent Chromium via Playwright)
+       |
+  ~/.twitter-mcp/chrome-profile/
+  (cookies + session state)
+```
+
+---
+
+## Project Structure
+
+```
+server.py               # MCP server, tool registration
+tools_read.py           # Search, user profile, user tweets, trending
+tools_feed.py           # Feed, bookmarks, notifications
+tools_write.py          # Post, reply, like, retweet
+browser_session.py      # Playwright session management, persistent Chrome profile
+twitter_keepalive.py    # Session keepalive cron script
+api_server.py           # Optional REST API wrapper
+```
+
+---
+
+## Comparison
+
+| Feature | Twitter MCP | Twitter API (Basic) | Twitter API (Pro) | Apify Scrapers |
+|---------|:-:|:-:|:-:|:-:|
+| Cost | **Free** | $100/mo | $5,000/mo | Per-run fees |
+| Auth | Browser login | OAuth + API key | OAuth + API key | API key |
+| Post tweets | Yes | Yes | Yes | No |
+| Read feed | Yes | Limited | Yes | Yes |
+| Bookmarks | Yes | No | Yes | No |
+| Search | Yes | Limited | Yes | Yes |
+| Rate limits | Browser-level | Strict | Strict | Per-plan |
+| MCP native | Yes | No | No | No |
+| Setup time | 2 min | 30+ min | Application | 10 min |
+
+---
+
+## License
+
+MIT
