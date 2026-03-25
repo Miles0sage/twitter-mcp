@@ -123,6 +123,18 @@ def create_server():
         except Exception as e:
             return f"Error: {e}"
 
+    @mcp.tool()
+    def twitter_bookmarks(max_results: int = 20) -> str:
+        """Read your saved/bookmarked tweets on Twitter/X. Requires auth cookies.
+        Args:
+            max_results: Max bookmarks to return (default 20)
+        """
+        try:
+            from tools_feed import sync_read_bookmarks
+            return sync_read_bookmarks(max_results)
+        except Exception as e:
+            return f"Error: {e}"
+
     return mcp
 
 
