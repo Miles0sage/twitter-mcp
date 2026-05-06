@@ -1,7 +1,7 @@
 import asyncio
 import json
 import concurrent.futures
-from browser_session import get_persistent_context, close_session
+from browser_session import get_persistent_context, close_session, get_fresh_page
 
 
 async def _wait_for_load(page):
@@ -15,7 +15,7 @@ async def post_tweet(text: str) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto("https://x.com/compose/post")
         await _wait_for_load(page)
@@ -39,7 +39,7 @@ async def reply_to_tweet(tweet_url: str, text: str) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto(tweet_url)
         await _wait_for_load(page)
@@ -68,7 +68,7 @@ async def like_tweet(tweet_url: str) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto(tweet_url)
         await _wait_for_load(page)
@@ -88,7 +88,7 @@ async def retweet(tweet_url: str) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto(tweet_url)
         await _wait_for_load(page)

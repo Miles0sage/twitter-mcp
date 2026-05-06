@@ -1,7 +1,7 @@
 import asyncio
 import json
 import concurrent.futures
-from browser_session import get_persistent_context, close_session
+from browser_session import get_persistent_context, close_session, get_fresh_page
 
 
 async def read_feed(max_results: int = 20) -> str:
@@ -9,7 +9,7 @@ async def read_feed(max_results: int = 20) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         # Use domcontentloaded instead of networkidle (Twitter never stops loading)
         await page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=20000)
@@ -65,7 +65,7 @@ async def read_notifications() -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto("https://x.com/notifications", wait_until="domcontentloaded", timeout=20000)
         await page.wait_for_selector('[data-testid="cellInnerDiv"]', timeout=15000)
@@ -115,7 +115,7 @@ async def read_bookmarks(max_results: int = 20) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         await page.goto("https://x.com/i/bookmarks", wait_until="domcontentloaded", timeout=20000)
         await page.wait_for_selector('[data-testid="tweet"]', timeout=15000)
