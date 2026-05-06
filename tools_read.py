@@ -3,7 +3,7 @@ import urllib.parse
 from playwright.async_api import async_playwright
 import concurrent.futures
 from typing import Optional
-from browser_session import get_persistent_context, close_session
+from browser_session import get_persistent_context, close_session, get_fresh_page
 
 
 async def _search_tweets_async(query: str, max_results: int = 10) -> str:
@@ -11,7 +11,7 @@ async def _search_tweets_async(query: str, max_results: int = 10) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         # Navigate to search results
         encoded_query = urllib.parse.quote(query)
@@ -88,7 +88,7 @@ async def _get_user_profile_async(username: str) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         # Navigate to user profile
         url = f"https://x.com/{username}"
@@ -137,7 +137,7 @@ async def _get_user_tweets_async(username: str, max_results: int = 10) -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         # Navigate to user profile
         url = f"https://x.com/{username}"
@@ -226,7 +226,7 @@ async def _get_trending_async() -> str:
     pw, context = await get_persistent_context()
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
 
         # Navigate to home page — trending sidebar loads here
         await page.goto("https://x.com/home", wait_until="networkidle")

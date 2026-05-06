@@ -29,13 +29,13 @@ BROWSER_ARGS = [
 
 IGNORE_ARGS = ["--enable-automation"]
 
-# Twitter blocks headless browsers. Use Xvfb virtual display instead.
-# Install: apt-get install -y xvfb
-# Start: Xvfb :99 -screen 0 1280x720x24 & export DISPLAY=:99
-USE_HEADLESS = False  # Set True only if Xvfb is NOT available
+# Verified 2026-05-07: with the existing anti-detection args + a logged-in profile,
+# X serves search/user/feed/etc. fine in true Playwright headless mode. Keep headless
+# on for tool calls; interactive flows (login) override via the headless= kwarg.
+USE_HEADLESS = True
 
 
-async def get_persistent_context() -> tuple:
+async def get_persistent_context(headless: bool | None = None) -> tuple:
     """Launch browser with persistent context.
 
     Returns (playwright, context) — caller must close both when done.
@@ -43,6 +43,8 @@ async def get_persistent_context() -> tuple:
     The persistent context stores cookies in PROFILE_DIR, which persists
     between launches. This is how real browsers work — cookies survive
     because the profile directory keeps them.
+
+    Pass headless=False to force a visible window (used by login.py).
     """
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
@@ -53,10 +55,8 @@ async def get_persistent_context() -> tuple:
     storage_path = Path(STORAGE_BACKUP)
     profile_cookies = Path(PROFILE_DIR) / "Default" / "Cookies"
 
-    # Check if Xvfb is running — if so, use non-headless (avoids Twitter bot detection)
-    import shutil
-    has_display = os.environ.get("DISPLAY") is not None
-    headless = USE_HEADLESS if has_display else True  # Fallback to headless if no display
+    if headless is None:
+        headless = USE_HEADLESS
 
     context = await pw.chromium.launch_persistent_context(
         user_data_dir=PROFILE_DIR,
@@ -79,6 +79,32 @@ async def get_persistent_context() -> tuple:
             pass  # Non-critical
 
     return pw, context
+
+
+async def get_fresh_page(context: BrowserContext):
+    """Open a new tab in the persistent context and focus it.
+
+    Avoids reusing tabs restored by --restore-last-session, which would otherwise
+    leave operations running on whichever stale tab happened to be at index 0.
+    """
+    page = await context.new_page()
+    try:
+        await page.bring_to_front()
+    except Exception:
+        pass
+    return page
+
+
+async def close_stale_pages(context: BrowserContext, keep: object) -> None:
+    """Close every page in the context except `keep`. Use for interactive flows
+    where restored tabs would clutter the window."""
+    for p in list(context.pages):
+        if p is keep:
+            continue
+        try:
+            await p.close()
+        except Exception:
+            pass
 
 
 async def save_session(context: BrowserContext):
@@ -115,7 +141,7 @@ async def import_fresh_cookies(cookies_path: str):
             await context.add_cookies(state["cookies"])
 
         # Visit Twitter to activate cookies and let them refresh
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
         await page.goto("https://x.com/home", wait_until="domcontentloaded")
         await page.wait_for_timeout(5000)
 

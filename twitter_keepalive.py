@@ -10,7 +10,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from browser_session import get_persistent_context, close_session
+from browser_session import get_persistent_context, close_session, get_fresh_page
 
 LOG_DIR = Path(__file__).parent / "data"
 
@@ -22,7 +22,7 @@ async def ping_twitter() -> dict:
         return {"success": False, "error": f"Browser launch failed: {e}"}
 
     try:
-        page = context.pages[0] if context.pages else await context.new_page()
+        page = await get_fresh_page(context)
         resp = await page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=20000)
         url = page.url
         status = resp.status if resp else 0
