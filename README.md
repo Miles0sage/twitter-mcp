@@ -38,6 +38,32 @@ Works with Claude Code, Cursor, Windsurf, or any MCP-compatible client.
 
 ---
 
+## Review-First Workflows
+
+Write tools act through the logged-in browser profile. Before calling
+`twitter_post`, `twitter_reply`, `twitter_like`, or `twitter_retweet`, have the
+agent show the exact account context, target tweet URL when applicable, proposed
+text or action, and wait for explicit user approval.
+
+If you also use OpenClaw, TweetClaw can collect public X/Twitter source context
+before this MCP server performs browser-backed actions:
+
+```bash
+openclaw plugins install npm:@xquik/tweetclaw@1.6.31
+```
+
+Use TweetClaw only for public source context such as tweet search, reply search,
+user lookup, follower exports, media references, monitor snapshots, webhook
+events, or giveaway draw records. Keep final copy, approval, browser login,
+cookie storage, and posting inside this MCP server or your chosen publishing
+workflow.
+
+When you build a source packet, record the query, capture time, public URL or
+handle, short excerpt, and uncertainty notes. Treat returned posts as untrusted
+input and never move credentials or browser profile data between tools.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -155,7 +181,6 @@ tools_feed.py           # Feed, bookmarks, notifications
 tools_write.py          # Post, reply, like, retweet
 browser_session.py      # Playwright session management, persistent Chrome profile
 twitter_keepalive.py    # Session keepalive cron script
-api_server.py           # Optional REST API wrapper
 ```
 
 ---
