@@ -1,4 +1,4 @@
-"""Twitter/X MCP Server — 10 tools for reading and posting on Twitter/X, no API key needed."""
+"""Twitter/X MCP Server - 10 tools for reading and posting on Twitter/X, no API key needed."""
 
 from mcp.server.fastmcp import FastMCP
 

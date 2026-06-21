@@ -71,6 +71,10 @@ async def _search_tweets_async(query: str, max_results: int = 10) -> str:
 
 def search_tweets(query: str, max_results: int = 10) -> str:
     """Synchronous wrapper for search_tweets."""
+    from tools_xquik import should_use_xquik, xquik_search_tweets
+    if should_use_xquik():
+        return xquik_search_tweets(query, max_results)
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -120,6 +124,10 @@ async def _get_user_profile_async(username: str) -> str:
 
 def get_user_profile(username: str) -> str:
     """Synchronous wrapper for get_user_profile."""
+    from tools_xquik import should_use_xquik, xquik_user_profile
+    if should_use_xquik():
+        return xquik_user_profile(username)
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -209,6 +217,10 @@ async def _get_user_tweets_async(username: str, max_results: int = 10) -> str:
 
 def get_user_tweets(username: str, max_results: int = 10) -> str:
     """Synchronous wrapper for get_user_tweets."""
+    from tools_xquik import should_use_xquik, xquik_user_tweets
+    if should_use_xquik():
+        return xquik_user_tweets(username, max_results)
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -228,7 +240,7 @@ async def _get_trending_async() -> str:
     try:
         page = context.pages[0] if context.pages else await context.new_page()
 
-        # Navigate to home page — trending sidebar loads here
+        # Navigate to home page - trending sidebar loads here
         await page.goto("https://x.com/home", wait_until="networkidle")
         await page.wait_for_timeout(3000)
 
@@ -262,6 +274,10 @@ async def _get_trending_async() -> str:
 
 def get_trending() -> str:
     """Synchronous wrapper for get_trending."""
+    from tools_xquik import should_use_xquik, xquik_trending
+    if should_use_xquik():
+        return xquik_trending()
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
